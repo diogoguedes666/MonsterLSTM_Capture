@@ -1532,8 +1532,8 @@ if __name__ == "__main__":
             auto_tuner.load_state_dict(prev_stats['auto_tuner_state'])
             print(f"\033[94m[AutoTuner] Restored previous best validation loss: {auto_tuner.best_loss:.6f}\033[0m")
         
-        # Reset patience counter at start of training
-        auto_tuner.patience_counter = 0
+        # Reset patience counter at start of training (using wait attribute)
+        auto_tuner.wait = 0
     else:
         train_track['best_val_loss'] = float('inf')
         config = AutoTunerConfig(
@@ -1633,7 +1633,7 @@ if __name__ == "__main__":
                     break
                 
                 # Stop if validation hasn't improved for too long
-                if auto_tuner.patience_counter > args.validation_p:
+                if args.validation_p and auto_tuner.wait > args.validation_p:
                     print('Validation patience limit reached')
                     break
 
