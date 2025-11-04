@@ -1,0 +1,60 @@
+# Files that should NOT be committed to git (outputs, local data, etc.)
+
+# Training outputs and results
+Results/
+runs2/
+*.pt
+*.pth
+checkpoint_epoch_*
+model_best.json
+model_interrupted.json
+training_stats.json
+
+# Audio data files (too large, upload separately)
+Data/train/*.wav
+Data/val/*.wav
+Data/test/*.wav
+Data/**/*.asd
+*.wav
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Environment and IDE files
+.env
+.venv
+venv/
+ENV/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+training.log
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Test outputs (keep test code, ignore outputs)
+CoreAudioML/result_test/
