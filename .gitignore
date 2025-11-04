@@ -58,3 +58,7 @@ training.log
 
 # Test outputs (keep test code, ignore outputs)
 CoreAudioML/result_test/
+
+# Temporary/deleted folders
+to be deleted/
+"to be deleted"/
