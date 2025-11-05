@@ -108,15 +108,48 @@ class SimpleRNN(nn.Module):
         return ep_loss / (batch_i + 1)
 
     # only proc processes a the input data and calculates the loss, optionally grad can be tracked or not
-    def process_data(self, input_data, target_data, loss_fcn, chunk, grad=False):
+    def process_data(self, input_data, target_data, loss_fcn, chunk, grad=False, init_len=200):
         with (torch.no_grad() if not grad else nullcontext()):
             output = torch.empty_like(target_data)
-            for l in range(int(output.size()[0] / chunk)):
-                output[l * chunk:(l + 1) * chunk] = self(input_data[l * chunk:(l + 1) * chunk])
+            
+            # Initialize hidden state by processing initial samples (warm-up period)
+            # This prevents pops/clicks at the beginning of the output
+            if input_data.size(0) > init_len:
+                # Warm up the model with initial samples to stabilize hidden state
+                # Discard these outputs - they're just for initialization
+                _ = self(input_data[0:init_len, :, :])
                 self.detach_hidden()
-            # If the data set doesn't divide evenly into the chunk length, process the remainder
-            if not (output.size()[0] / chunk).is_integer():
-                output[(l + 1) * chunk:-1] = self(input_data[(l + 1) * chunk:-1])
+                
+                # Now process from the beginning with initialized hidden state
+                # Process in chunks to avoid memory issues
+                for l in range(int(output.size()[0] / chunk)):
+                    chunk_start = l * chunk
+                    chunk_end = min(chunk_start + chunk, output.size(0))
+                    output[chunk_start:chunk_end, :, :] = self(input_data[chunk_start:chunk_end, :, :])
+                    self.detach_hidden()
+                
+                # Process remainder if needed
+                if not (output.size()[0] / chunk).is_integer():
+                    remaining_start = int(output.size()[0] / chunk) * chunk
+                    output[remaining_start:, :, :] = self(input_data[remaining_start:, :, :])
+                    self.detach_hidden()
+                
+                # Apply fade-in to first init_len samples to prevent pop from initial state transition
+                fade_samples = min(init_len, output.size(0))
+                fade_curve = torch.linspace(0.0, 1.0, fade_samples, device=output.device)
+                # Apply fade to all channels
+                for ch in range(output.size(1)):
+                    output[0:fade_samples, ch, :] *= fade_curve.unsqueeze(1)
+            else:
+                # Audio is shorter than init_len, process normally without fade
+                for l in range(int(output.size()[0] / chunk)):
+                    output[l * chunk:(l + 1) * chunk] = self(input_data[l * chunk:(l + 1) * chunk])
+                    self.detach_hidden()
+                # If the data set doesn't divide evenly into the chunk length, process the remainder
+                if not (output.size()[0] / chunk).is_integer():
+                    output[(l + 1) * chunk:, :, :] = self(input_data[(l + 1) * chunk:, :, :])
+                    self.detach_hidden()
+            
             self.reset_hidden()
             loss = loss_fcn(output, target_data)
         return output, loss

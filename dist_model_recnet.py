@@ -134,7 +134,7 @@ class AutoTunerConfig:
     # Existing parameters
     initial_lr: float
     initial_grad_clip: float
-    min_lr: float = 0.00001  # Lower minimum to allow more fine-tuning
+    min_lr: float = 0.000001  # Lower minimum to allow more fine-tuning
     max_lr: float = 1.0
     min_grad_clip: float = 1e-3
     max_grad_clip: float = 100.0
@@ -153,7 +153,7 @@ class AutoTunerConfig:
     
     initial_weight_decay: float = 0.000001
     min_weight_decay: float = 0.00000001
-    max_weight_decay: float = 0.0001
+    max_weight_decay: float = 0.01
     
     def __post_init__(self):
         """Validate all configuration parameters"""
@@ -1595,7 +1595,7 @@ if __name__ == "__main__":
                 val_ep_st_time = time.time()
                 val_output, val_loss = network.process_data(dataset.subsets['val'].data['input'][0],
                                                  dataset.subsets['val'].data['target'][0], 
-                                                 loss_functions, args.val_chunk)
+                                                 loss_functions, args.val_chunk, grad=False, init_len=args.init_len)
                 
                 # Use AutoTuner for all hyperparameter management
                 improved = auto_tuner.step(val_loss.item())
@@ -1660,7 +1660,7 @@ if __name__ == "__main__":
 
     lossESR = training.ESRLoss()
     test_output, test_loss = network.process_data(dataset.subsets['test'].data['input'][0],
-                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk)
+                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk, grad=False, init_len=args.init_len)
     test_loss_ESR = lossESR(test_output, dataset.subsets['test'].data['target'][0])
     write(os.path.join(save_path, "test_out_final.wav"), dataset.subsets['test'].fs, test_output.cpu().numpy()[:, 0, 0])
     writer.add_scalar('Loss/test_loss', test_loss.item(), 1)
@@ -1671,7 +1671,7 @@ if __name__ == "__main__":
     best_val_net = miscfuncs.json_load('model_best', save_path)
     network = networks.load_model(best_val_net)
     test_output, test_loss = network.process_data(dataset.subsets['test'].data['input'][0],
-                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk)
+                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk, grad=False, init_len=args.init_len)
     test_loss_ESR = lossESR(test_output, dataset.subsets['test'].data['target'][0])
     write(os.path.join(save_path, "test_out_bestv.wav"),
           dataset.subsets['test'].fs, test_output.cpu().numpy()[:, 0, 0])
