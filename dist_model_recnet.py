@@ -105,7 +105,7 @@ prsr.add_argument('--unit_type', '-ut', default='LSTM', help='LSTM or GRU or RNN
 prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connection for the input to the output')
 
 prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-6, help='Weight decay for optimizer')
-prsr.add_argument('--gradient_clip', '-gc', type=float, default=1.0, help='Gradient clipping value')
+prsr.add_argument('--gradient_clip', '-gc', type=float, default=0.9, help='Gradient clipping value')
 
 args = prsr.parse_args()
 
@@ -134,7 +134,7 @@ class AutoTunerConfig:
     # Existing parameters
     initial_lr: float
     initial_grad_clip: float
-    min_lr: float = 0.00005
+    min_lr: float = 0.00001  # Lower minimum to allow more fine-tuning
     max_lr: float = 1.0
     min_grad_clip: float = 1e-3
     max_grad_clip: float = 100.0
@@ -354,7 +354,7 @@ class OptimizedLRManager:
             return True
         else:
             self.patience_counter += 1
-            if self.patience_counter > 5:  # Reduce LR after 5 epochs without improvement
+            if self.patience_counter > 10:  # Reduce LR after 5 epochs without improvement
                 self._reduce_lr()
             return False
     
