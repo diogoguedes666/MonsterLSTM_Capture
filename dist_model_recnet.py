@@ -62,9 +62,9 @@ prsr.add_argument('--segment_length', '-slen', type=int, default=22050, help='Tr
 
 # number of epochs and validation
 prsr.add_argument('--epochs', '-eps', type=int, default=2000, help='Max number of training epochs to run')
-prsr.add_argument('--validation_f', '-vfr', type=int, default=5, help='Validation Frequency (in epochs)')
+prsr.add_argument('--validation_f', '-vfr', type=int, default=2, help='Validation Frequency (in epochs)')
 # TO DO
-prsr.add_argument('--validation_p', '-vp', type=int, default=50,
+prsr.add_argument('--validation_p', '-vp', type=int, default=20,
                   help='How many validations without improvement before stopping training, None for no early stopping')
 
 # settings for the training epoch
@@ -75,17 +75,17 @@ prsr.add_argument('--iter_num', '-it', type=int, default=None,
 prsr.add_argument('--learn_rate', '-lr', type=float, default=0.005, help='Initial learning rate')
 prsr.add_argument('--init_len', '-il', type=int, default=200,
                   help='Number of sequence samples to process before starting weight updates')
-prsr.add_argument('--up_fr', '-uf', type=int, default=1000,
+prsr.add_argument('--up_fr', '-uf', type=int, default=750,
                   help='For recurrent models, number of samples to run in between updating network weights, i.e the '
                        'default argument updates every 1000 samples')
 prsr.add_argument('--cuda', '-cu', default=1, help='Use GPU if available')
 
 # loss function/s
-prsr.add_argument('--loss_fcns', '-lf', default={'ESRPre': 0.90, 'DC': 0.10},
-                  help='Which loss functions, ESR, ESRPre, DC. Argument is a dictionary with each key representing a'
+prsr.add_argument('--loss_fcns', '-lf', default={'ESRPre': 0.70, 'DC': 0.10, 'Spectral': 0.20},
+                  help='Which loss functions, ESR, ESRPre, DC, Spectral. Argument is a dictionary with each key representing a'
                        'loss function name and the corresponding value being the multiplication factor applied to that'
                        'loss function, used to control the contribution of each loss function to the overall loss ')
-prsr.add_argument('--pre_filt',   '-pf',   default='high_pass',
+prsr.add_argument('--pre_filt',   '-pf',   default='None',
                     help='FIR filter coefficients for pre-emphasis filter, can also read in a csv file')
 
 # the validation and test sets are divided into shorter chunks before processing to reduce the amount of GPU memory used
@@ -105,7 +105,7 @@ prsr.add_argument('--unit_type', '-ut', default='LSTM', help='LSTM or GRU or RNN
 prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connection for the input to the output')
 
 prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-6, help='Weight decay for optimizer')
-prsr.add_argument('--gradient_clip', '-gc', type=float, default=0.9, help='Gradient clipping value')
+prsr.add_argument('--gradient_clip', '-gc', type=float, default=1.0, help='Gradient clipping value')
 
 args = prsr.parse_args()
 
@@ -176,8 +176,10 @@ class AutoTuner:
         self.min_lr = config.min_lr
         self.max_lr = config.max_lr
         self.history = []
-        self.momentum_window = 5
+        self.momentum_window = 7  # Increased from 5 to require more history
         self.improvement_threshold = 0.01
+        self.min_validations_before_tuning = 2  # Don't start tuning until we have enough data
+        self.oscillation_count_threshold = 3  # Require multiple oscillations before adjusting
         
         # Set initial learning rate
         for param_group in self.optimizer.param_groups:
@@ -220,20 +222,21 @@ class AutoTuner:
         # Store old values for comparison
         old_lr = self.lr
         
-        # Analyze loss trend
-        if len(self.history) >= self.momentum_window:
-            recent_trend = self.analyze_trend()
-            
-            if recent_trend == 'plateau':
-                self.lr *= 0.8  # Reduce learning rate
-                print(f"\033[93m[AutoTuner] Plateau detected - Reducing learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
-                self.wait = 0
-            elif recent_trend == 'oscillating':
-                self.lr *= 0.7  # Smooth descent with smaller steps
-                print(f"\033[93m[AutoTuner] Oscillation detected - Adjusting learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
-            elif recent_trend == 'improving':
-                self.lr *= 1.1  # Slightly increase learning rate
-                print(f"\033[92m[AutoTuner] Steady improvement - Increasing learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
+        # Analyze loss trend - only if we have enough validation history
+        if len(self.history) >= self.min_validations_before_tuning:
+            if len(self.history) >= self.momentum_window:
+                recent_trend = self.analyze_trend()
+                
+                if recent_trend == 'plateau':
+                    self.lr *= 0.8  # Reduce learning rate
+                    print(f"\033[93m[AutoTuner] Plateau detected - Reducing learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
+                    self.wait = 0
+                elif recent_trend == 'oscillating':
+                    self.lr *= 0.7  # Smooth descent with smaller steps
+                    print(f"\033[93m[AutoTuner] Oscillation detected - Adjusting learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
+                elif recent_trend == 'improving':
+                    self.lr *= 1.1  # Slightly increase learning rate
+                    print(f"\033[92m[AutoTuner] Steady improvement - Increasing learning rate: {old_lr:.6f} -> {self.lr:.6f}\033[0m")
                 
         # Ensure learning rate stays within bounds
         if self.lr != max(self.min_lr, min(self.max_lr, self.lr)):
@@ -257,8 +260,9 @@ class AutoTuner:
         if abs(sum(improvements)) < self.improvement_threshold:
             return 'plateau'
             
-        # Check for oscillation
-        if any(i * j < 0 for i, j in zip(improvements[:-1], improvements[1:])):
+        # Check for oscillation - require multiple sign changes for more tolerance
+        sign_changes = sum(1 for i, j in zip(improvements[:-1], improvements[1:]) if i * j < 0)
+        if sign_changes >= self.oscillation_count_threshold:
             return 'oscillating'
             
         # Check if consistently improving
@@ -1471,6 +1475,31 @@ class AdaptiveValidator:
                 if old_freq != self.current_freq:
                     print(f"\033[92m[Validator] Stable training detected - Decreasing validation frequency: {old_freq} -> {self.current_freq} epochs\033[0m")
 
+    def _analyze_trend(self) -> str:
+        """Analyze loss trend to determine training stability"""
+        recent = self.loss_history[-self.stability_window:]
+
+        # Calculate loss differences (improvements)
+        differences = [recent[i] - recent[i-1] for i in range(1, len(recent))]
+
+        # Calculate variance in loss to detect oscillations
+        loss_variance = np.var(recent) if len(recent) > 1 else 0
+
+        # Calculate average improvement
+        avg_improvement = np.mean(differences) if differences else 0
+
+        # Thresholds for stability detection
+        variance_threshold = 0.001  # Low variance = stable
+        improvement_threshold = 0.0001  # Minimal improvement = plateau
+
+        # Determine trend
+        if loss_variance > variance_threshold:
+            return 'unstable'  # High variance indicates oscillations or instability
+        elif abs(avg_improvement) < improvement_threshold:
+            return 'stable'  # Low variance and minimal improvement = stable plateau
+        else:
+            return 'normal'  # Normal training progress
+
 if __name__ == "__main__":
     """The main method creates the recurrent network, trains it and carries out validation/testing """
     start_time = time.time()
@@ -1509,9 +1538,11 @@ if __name__ == "__main__":
         device = torch.device('cpu')
 
     # Initialize network, optimizer, and scheduler
+    # Use lower beta2 for smoother updates (helps with high-frequency stability)
     optimiser = torch.optim.Adam(network.parameters(), 
                                 lr=args.learn_rate,
-                                weight_decay=args.weight_decay)  # Add L2 regularization
+                                weight_decay=args.weight_decay,
+                                betas=(0.9, 0.99))  # Lower beta2 for smoother updates
     ### scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min', factor=0.90, patience=5)
     loss_functions = training.LossWrapper(args.loss_fcns, args.pre_filt)
 
@@ -1595,7 +1626,7 @@ if __name__ == "__main__":
                 val_ep_st_time = time.time()
                 val_output, val_loss = network.process_data(dataset.subsets['val'].data['input'][0],
                                                  dataset.subsets['val'].data['target'][0], 
-                                                 loss_functions, args.val_chunk, grad=False, init_len=args.init_len)
+                                                 loss_functions, args.val_chunk)
                 
                 # Use AutoTuner for all hyperparameter management
                 improved = auto_tuner.step(val_loss.item())
@@ -1621,6 +1652,9 @@ if __name__ == "__main__":
                 train_track.val_epoch_update(val_loss.item(), val_ep_st_time, time.time())
                 writer.add_scalar('Loss/val', train_track['validation_losses'][-1], epoch)
                 writer.add_scalar('LR/current', current_lr)
+
+                # Update adaptive validator with current loss
+                validator.update_frequency(val_loss.item())
                 
                 # Save training state including AutoTuner state
                 train_track_dict = dict(train_track)
@@ -1660,7 +1694,7 @@ if __name__ == "__main__":
 
     lossESR = training.ESRLoss()
     test_output, test_loss = network.process_data(dataset.subsets['test'].data['input'][0],
-                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk, grad=False, init_len=args.init_len)
+                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk)
     test_loss_ESR = lossESR(test_output, dataset.subsets['test'].data['target'][0])
     write(os.path.join(save_path, "test_out_final.wav"), dataset.subsets['test'].fs, test_output.cpu().numpy()[:, 0, 0])
     writer.add_scalar('Loss/test_loss', test_loss.item(), 1)
@@ -1671,7 +1705,7 @@ if __name__ == "__main__":
     best_val_net = miscfuncs.json_load('model_best', save_path)
     network = networks.load_model(best_val_net)
     test_output, test_loss = network.process_data(dataset.subsets['test'].data['input'][0],
-                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk, grad=False, init_len=args.init_len)
+                                     dataset.subsets['test'].data['target'][0], loss_functions, args.test_chunk)
     test_loss_ESR = lossESR(test_output, dataset.subsets['test'].data['target'][0])
     write(os.path.join(save_path, "test_out_bestv.wav"),
           dataset.subsets['test'].fs, test_output.cpu().numpy()[:, 0, 0])
