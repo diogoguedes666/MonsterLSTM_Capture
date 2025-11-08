@@ -1,1 +1,1 @@
-{"hidden_size": 32, "unit_type": "LSTM", "loss_fcns": {"ESR": 0.9, "DC": 0.1}, "pre_filt": "None", "device": "dls2", "file_name": "dls2"}
+{"hidden_size": 64, "unit_type": "LSTM", "loss_fcns": {"ESR": 0.80, "DC": 0.10, "Spectral": 0.10}, "pre_filt": "None", "device": "dls2", "file_name": "dls2"}

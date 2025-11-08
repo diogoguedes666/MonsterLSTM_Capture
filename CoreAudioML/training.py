@@ -32,10 +32,10 @@ class DCLoss(nn.Module):
 
 
 class SpectralLoss(nn.Module):
-    """Spectral loss that emphasizes high frequency matching, especially above 5kHz"""
-    def __init__(self, n_fft=2048, hop_length=512, sample_rate=44100, 
+    """Spectral loss that emphasizes high frequency matching, especially above 10kHz"""
+    def __init__(self, n_fft=1024, hop_length=512, sample_rate=44100, 
                  low_freq_weight=1.0, mid_freq_weight=2.0, high_freq_weight=5.0,
-                 mid_cutoff=3000, high_cutoff=5000, excess_penalty=3.0):
+                 mid_cutoff=5000, high_cutoff=10000, excess_penalty=10.0):
         super(SpectralLoss, self).__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
@@ -65,12 +65,12 @@ class SpectralLoss(nn.Module):
                 # Low frequencies: normal weight
                 self.freq_weights[i] = self.low_freq_weight
             elif freq_hz <= high_cutoff:
-                # Mid-high frequencies (3-5kHz): moderate weight with smooth transition
+                # Mid-high frequencies (5-10kHz): moderate weight with smooth transition
                 progress = (freq_hz - mid_cutoff) / (high_cutoff - mid_cutoff)
                 weight = self.low_freq_weight + (self.mid_freq_weight - self.low_freq_weight) * progress
                 self.freq_weights[i] = weight
             else:
-                # High frequencies (5kHz+): heavy weight with smooth transition
+                # High frequencies (10kHz+): heavy weight with smooth transition
                 # Exponential increase for very high frequencies
                 progress = (freq_hz - high_cutoff) / ((sample_rate / 2) - high_cutoff)
                 # Use exponential curve for more aggressive weighting at very high frequencies
@@ -106,6 +106,14 @@ class SpectralLoss(nn.Module):
                         output_ch = output_ch.unsqueeze(0)  # [1, seq_len]
                         target_ch = target_ch.unsqueeze(0)  # [1, seq_len]
                     
+                    # Ensure sequence is long enough for STFT (at least n_fft samples)
+                    seq_len_actual = output_ch.shape[-1]
+                    if seq_len_actual < self.n_fft:
+                        # Pad with zeros if sequence is too short
+                        pad_size = self.n_fft - seq_len_actual
+                        output_ch = torch.nn.functional.pad(output_ch, (0, pad_size), mode='constant', value=0.0)
+                        target_ch = torch.nn.functional.pad(target_ch, (0, pad_size), mode='constant', value=0.0)
+                    
                     output_stft = torch.stft(output_ch, n_fft=self.n_fft, hop_length=self.hop_length,
                                            return_complex=True, normalized=False)
                     target_stft = torch.stft(target_ch, n_fft=self.n_fft, hop_length=self.hop_length,
@@ -124,7 +132,7 @@ class SpectralLoss(nn.Module):
                     mag_diff = torch.pow(target_mag_weighted - output_mag_weighted, 2)
                     base_loss = torch.mean(mag_diff)
                     
-                    # Asymmetric penalty: heavily penalize excess high frequencies (above 5kHz)
+                    # Asymmetric penalty: heavily penalize excess high frequencies (above 10kHz)
                     # This specifically targets when output has MORE energy than target
                     high_freq_bin = int(self.high_cutoff * self.freq_weights.shape[0] / (self.sample_rate / 2))
                     high_freq_mask = torch.zeros_like(self.freq_weights)

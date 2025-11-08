@@ -2,6 +2,7 @@ import CoreAudioML.miscfuncs as miscfuncs
 import CoreAudioML.training as training
 import CoreAudioML.dataset as dataset
 import CoreAudioML.networks as networks
+import CoreAudioML.diagnostics as diagnostics
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
@@ -106,6 +107,8 @@ prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connecti
 
 prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-4, help='Weight decay for optimizer')
 prsr.add_argument('--gradient_clip', '-gc', type=float, default=1.0, help='Gradient clipping value')
+prsr.add_argument('--enable_diagnostics', action='store_true', default=True, help='Enable training dashboard diagnostics')
+prsr.add_argument('--disable_diagnostics', action='store_false', dest='enable_diagnostics', help='Disable training dashboard diagnostics')
 
 args = prsr.parse_args()
 
@@ -278,6 +281,9 @@ def save_training_state():
     miscfuncs.json_save(train_track_dict, 'training_stats', save_path)
 
 def save_checkpoint(network, auto_tuner, train_track, epoch, save_path):
+    # Ensure save directory exists
+    os.makedirs(save_path, exist_ok=True)
+    
     # Create a simpler checkpoint filename
     checkpoint_path = os.path.join(save_path, f"checkpoint_epoch_{epoch}")
     
@@ -1527,6 +1533,9 @@ if __name__ == "__main__":
 
     # Generate name of directory where results will be saved
     save_path = os.path.join(args.save_location, args.device + '-' + args.load_config)
+    
+    # Ensure save directory exists
+    os.makedirs(save_path, exist_ok=True)
 
     # Check if an existing saved model exists, and load it, otherwise creates a new model
     network = init_model(save_path, args)
@@ -1611,6 +1620,16 @@ if __name__ == "__main__":
         max_freq=20
     )
 
+    # Initialize training dashboard if enabled
+    dashboard = None
+    if args.enable_diagnostics:
+        try:
+            dashboard = diagnostics.TrainingDashboard(results_dir=save_path, max_history=5)
+            print("\033[94m[Dashboard] Training dashboard initialized\033[0m")
+        except Exception as e:
+            print(f"\033[93m[Dashboard] Warning: Could not initialize dashboard: {e}\033[0m")
+            dashboard = None
+
     # Training loop
     try:
         for epoch in range(train_track['current_epoch'] + 1, args.epochs + 1):
@@ -1645,9 +1664,18 @@ if __name__ == "__main__":
                 
                 if improved:
                     network.save_model('model_best', save_path)
-                    write(os.path.join(save_path, "best_val_out.wav"),
-                          dataset.subsets['test'].fs, val_output.cpu().numpy()[:, 0, 0])
+                    best_val_out_path = os.path.join(save_path, "best_val_out.wav")
+                    write(best_val_out_path,
+                          dataset.subsets['val'].fs, val_output.cpu().numpy()[:, 0, 0])
                     print(f"\033[92mNew best validation loss: {val_loss.item():.6f}\033[0m")
+                    
+                    # Update dashboard if enabled
+                    if dashboard is not None:
+                        try:
+                            target_path = os.path.join(args.data_location, 'val', args.file_name + '-target.wav')
+                            dashboard.update(target_path, best_val_out_path, epoch, val_loss.item(), dict(train_track))
+                        except Exception as e:
+                            print(f"\033[93m[Dashboard] Warning: Could not update dashboard: {e}\033[0m")
                 
                 train_track.val_epoch_update(val_loss.item(), val_ep_st_time, time.time())
                 writer.add_scalar('Loss/val', train_track['validation_losses'][-1], epoch)
@@ -1690,7 +1718,14 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\033[91mError during training: {str(e)}\033[0m")
         save_checkpoint(network, auto_tuner, train_track, epoch, save_path)
+        if dashboard is not None:
+            dashboard.close()
         raise e
+    
+    # Close dashboard at end of training
+    if dashboard is not None:
+        dashboard.close()
+        print("\033[94m[Dashboard] Training dashboard closed\033[0m")
 
     lossESR = training.ESRLoss()
     test_output, test_loss = network.process_data(dataset.subsets['test'].data['input'][0],
