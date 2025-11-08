@@ -104,7 +104,7 @@ prsr.add_argument('--hidden_size', '-hs', default=32, type=int, help='Recurrent 
 prsr.add_argument('--unit_type', '-ut', default='LSTM', help='LSTM or GRU or RNN')
 prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connection for the input to the output')
 
-prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-6, help='Weight decay for optimizer')
+prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-4, help='Weight decay for optimizer')
 prsr.add_argument('--gradient_clip', '-gc', type=float, default=1.0, help='Gradient clipping value')
 
 args = prsr.parse_args()
@@ -151,7 +151,7 @@ class AutoTunerConfig:
     min_momentum: float = 0.8
     max_momentum: float = 0.999
     
-    initial_weight_decay: float = 0.000001
+    initial_weight_decay: float = 0.00001
     min_weight_decay: float = 0.00000001
     max_weight_decay: float = 0.01
     
