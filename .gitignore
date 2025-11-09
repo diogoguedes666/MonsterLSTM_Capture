@@ -16,6 +16,8 @@ Data/val/*.wav
 Data/test/*.wav
 Data/**/*.asd
 *.wav
+Data.zip
+*.zip
 
 # Python cache
 __pycache__/
