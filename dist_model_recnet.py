@@ -73,7 +73,7 @@ prsr.add_argument('--batch_size', '-bs', type=int, default=1024, help='Training 
 prsr.add_argument('--iter_num', '-it', type=int, default=None,
                   help='Overrides --batch_size and instead sets the batch_size so that a total of --iter_num batches'
                        'are processed in each epoch')
-prsr.add_argument('--learn_rate', '-lr', type=float, default=0.005, help='Initial learning rate')
+prsr.add_argument('--learn_rate', '-lr', type=float, default=0.0005, help='Initial learning rate (DAFx\'19 recommendation: 5e-4)')
 prsr.add_argument('--init_len', '-il', type=int, default=200,
                   help='Number of sequence samples to process before starting weight updates')
 prsr.add_argument('--up_fr', '-uf', type=int, default=750,
@@ -82,8 +82,8 @@ prsr.add_argument('--up_fr', '-uf', type=int, default=750,
 prsr.add_argument('--cuda', '-cu', default=1, help='Use GPU if available')
 
 # loss function/s
-prsr.add_argument('--loss_fcns', '-lf', default={'ESRPre': 0.70, 'DC': 0.10, 'Spectral': 0.20},
-                  help='Which loss functions, ESR, ESRPre, DC, Spectral. Argument is a dictionary with each key representing a'
+prsr.add_argument('--loss_fcns', '-lf', default={'ESR': 0.50, 'DC': 0.10, 'HFHinge': 0.10},
+                  help='Which loss functions, ESR, ESRPre, DC, Spectral (deprecated), HFHinge. Argument is a dictionary with each key representing a'
                        'loss function name and the corresponding value being the multiplication factor applied to that'
                        'loss function, used to control the contribution of each loss function to the overall loss ')
 prsr.add_argument('--pre_filt',   '-pf',   default='None',
@@ -101,12 +101,14 @@ prsr.add_argument('--model', '-m', default='SimpleRNN', type=str, help='model ar
 prsr.add_argument('--input_size', '-is', default=1, type=int, help='1 for mono input data, 2 for stereo, etc ')
 prsr.add_argument('--output_size', '-os', default=1, type=int, help='1 for mono output data, 2 for stereo, etc ')
 prsr.add_argument('--num_blocks', '-nb', default=2, type=int, help='Number of recurrent blocks')
-prsr.add_argument('--hidden_size', '-hs', default=32, type=int, help='Recurrent unit hidden state size')
+prsr.add_argument('--hidden_size', '-hs', default=96, type=int, help='Recurrent unit hidden state size (DAFx\'19 recommendation: 64-96 for real-time)')
 prsr.add_argument('--unit_type', '-ut', default='LSTM', help='LSTM or GRU or RNN')
 prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connection for the input to the output')
 
-prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-4, help='Weight decay for optimizer')
-prsr.add_argument('--gradient_clip', '-gc', type=float, default=1.0, help='Gradient clipping value')
+prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-4, help='Weight decay for optimizer (recurrent weights use lower decay: 3e-5)')
+prsr.add_argument('--hf_hinge_fmin', type=float, default=10000, help='HF hinge loss minimum frequency threshold (Hz)')
+prsr.add_argument('--hf_hinge_strength', type=float, default=0.5, help='HF hinge loss strength multiplier')
+prsr.add_argument('--gradient_clip', '-gc', type=float, default=3.0, help='Gradient clipping value (DAFx\'19 safe zone: 3-5)')
 prsr.add_argument('--enable_diagnostics', action='store_true', default=True, help='Enable training dashboard diagnostics')
 prsr.add_argument('--disable_diagnostics', action='store_false', dest='enable_diagnostics', help='Disable training dashboard diagnostics')
 
@@ -1547,13 +1549,37 @@ if __name__ == "__main__":
         device = torch.device('cpu')
 
     # Initialize network, optimizer, and scheduler
-    # Use lower beta2 for smoother updates (helps with high-frequency stability)
-    optimiser = torch.optim.Adam(network.parameters(), 
-                                lr=args.learn_rate,
-                                weight_decay=args.weight_decay,
-                                betas=(0.9, 0.99))  # Lower beta2 for smoother updates
+    # DAFx'19 compatible optimizer settings
+    # Separate parameter groups for recurrent weights (lower weight decay to preserve memory/bloom)
+    recurrent_params = []
+    non_recurrent_params = []
+    
+    for name, param in network.named_parameters():
+        if 'weight_hh' in name:  # Recurrent weight matrices
+            recurrent_params.append(param)
+        else:
+            non_recurrent_params.append(param)
+    
+    # Create optimizer with separate parameter groups
+    if recurrent_params and non_recurrent_params:
+        optimiser = torch.optim.AdamW([
+            {'params': non_recurrent_params, 'weight_decay': args.weight_decay},
+            {'params': recurrent_params, 'weight_decay': 3e-5}  # Lower decay for recurrent weights
+        ], lr=args.learn_rate, betas=(0.9, 0.999))  # Standard Adam defaults, DAFx'19 compatible
+    else:
+        # Fallback if no recurrent weights found
+        optimiser = torch.optim.AdamW(network.parameters(), 
+                                    lr=args.learn_rate,
+                                    weight_decay=args.weight_decay,
+                                    betas=(0.9, 0.999))
+    
     ### scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min', factor=0.90, patience=5)
-    loss_functions = training.LossWrapper(args.loss_fcns, args.pre_filt)
+    # Get HF hinge parameters from args (with defaults if not in config)
+    hf_hinge_fmin = getattr(args, 'hf_hinge_fmin', 10000)
+    hf_hinge_strength = getattr(args, 'hf_hinge_strength', 0.5)
+    loss_functions = training.LossWrapper(args.loss_fcns, args.pre_filt, 
+                                         hf_hinge_fmin=hf_hinge_fmin,
+                                         hf_hinge_strength=hf_hinge_strength)
 
     # Initialize train_track first
     train_track = training.TrainTrack()

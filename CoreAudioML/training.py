@@ -31,12 +31,102 @@ class DCLoss(nn.Module):
         return loss
 
 
+class HFHingeLoss(nn.Module):
+    """
+    High-frequency hinge loss that asymmetrically penalizes excess high frequencies.
+    Only penalizes when model output > target in high frequencies, preventing dulling
+    of legitimate high-frequency content while suppressing artifacts.
+    
+    Based on DAFx'19 recommendations for controlling high-frequency artifacts
+    in distortion pedal modeling.
+    """
+    def __init__(self, n_fft=2048, hop_length=None, sample_rate=44100, fmin=10000, strength=0.5):
+        super(HFHingeLoss, self).__init__()
+        self.n_fft = n_fft
+        self.hop_length = hop_length if hop_length is not None else n_fft // 4
+        self.sample_rate = sample_rate
+        self.fmin = fmin
+        self.strength = strength
+        
+        # Create frequency mask for high frequencies
+        n_freq_bins = n_fft // 2 + 1
+        freqs = torch.linspace(0, sample_rate / 2, n_freq_bins)
+        mask = (freqs >= fmin).float()
+        self.register_buffer('hf_mask', mask)
+    
+    def forward(self, output, target):
+        """
+        Compute HF hinge loss - only penalizes excess high frequencies.
+        Args:
+            output: [seq_len, batch, channels]
+            target: [seq_len, batch, channels]
+        """
+        # Handle different input shapes
+        if output.dim() == 3:
+            # Assuming [seq_len, batch, channels] format
+            seq_len, batch_size, n_channels = output.shape
+            
+            # Convert to [batch, channels, seq_len] for easier processing
+            output = output.permute(1, 2, 0)  # [batch, channels, seq_len]
+            target = target.permute(1, 2, 0)  # [batch, channels, seq_len]
+            
+            total_loss = 0
+            for b in range(batch_size):
+                for ch in range(n_channels):
+                    output_ch = output[b, ch, :]  # [seq_len]
+                    target_ch = target[b, ch, :]  # [seq_len]
+                    
+                    # Compute STFT - torch.stft expects [batch, samples] or [samples]
+                    # Add batch dimension if needed
+                    if output_ch.dim() == 1:
+                        output_ch = output_ch.unsqueeze(0)  # [1, seq_len]
+                        target_ch = target_ch.unsqueeze(0)  # [1, seq_len]
+                    
+                    # Ensure sequence is long enough for STFT (at least n_fft samples)
+                    seq_len_actual = output_ch.shape[-1]
+                    if seq_len_actual < self.n_fft:
+                        # Pad with zeros if sequence is too short
+                        pad_size = self.n_fft - seq_len_actual
+                        output_ch = torch.nn.functional.pad(output_ch, (0, pad_size), mode='constant', value=0.0)
+                        target_ch = torch.nn.functional.pad(target_ch, (0, pad_size), mode='constant', value=0.0)
+                    
+                    output_stft = torch.stft(output_ch, n_fft=self.n_fft, hop_length=self.hop_length,
+                                           return_complex=True, normalized=False)
+                    target_stft = torch.stft(target_ch, n_fft=self.n_fft, hop_length=self.hop_length,
+                                           return_complex=True, normalized=False)
+                    
+                    # Get magnitude spectra [n_freq, n_time]
+                    output_mag = torch.abs(output_stft[0])  # Remove batch dim
+                    target_mag = torch.abs(target_stft[0])  # Remove batch dim
+                    
+                    # Apply HF mask [n_freq, 1]
+                    hf_mask = self.hf_mask.unsqueeze(1)  # [n_freq, 1]
+                    
+                    # Find excess high frequencies (only when output > target)
+                    excess = torch.relu(output_mag - target_mag)  # Only positive differences
+                    excess_hf = excess * hf_mask  # Apply HF mask
+                    
+                    # Apply log1p for smooth penalty scaling
+                    loss = torch.log1p(excess_hf).mean()
+                    
+                    total_loss += loss
+            
+            return self.strength * (total_loss / (batch_size * n_channels))
+        else:
+            raise ValueError(f"Unexpected input shape: {output.shape}")
+
+
 class SpectralLoss(nn.Module):
-    """Spectral loss that emphasizes high frequency matching, especially above 10kHz"""
+    """
+    DEPRECATED: Spectral loss that emphasizes high frequency matching, especially above 10kHz.
+    Consider using HFHingeLoss instead for better control of high-frequency artifacts.
+    """
     def __init__(self, n_fft=1024, hop_length=512, sample_rate=44100, 
                  low_freq_weight=1.0, mid_freq_weight=2.0, high_freq_weight=5.0,
                  mid_cutoff=5000, high_cutoff=10000, excess_penalty=10.0):
         super(SpectralLoss, self).__init__()
+        import warnings
+        warnings.warn("SpectralLoss is deprecated. Consider using HFHingeLoss instead.", DeprecationWarning)
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.sample_rate = sample_rate
@@ -190,9 +280,14 @@ class PreEmph(nn.Module):
         return output.permute(2, 0, 1), target.permute(2, 0, 1)
 
 class LossWrapper(nn.Module):
-    def __init__(self, losses, pre_filt=None):
+    def __init__(self, losses, pre_filt=None, hf_hinge_fmin=10000, hf_hinge_strength=0.5):
         super(LossWrapper, self).__init__()
-        loss_dict = {'ESR': ESRLoss(), 'DC': DCLoss(), 'Spectral': SpectralLoss()}
+        loss_dict = {
+            'ESR': ESRLoss(), 
+            'DC': DCLoss(), 
+            'Spectral': SpectralLoss(),  # Deprecated but kept for backward compatibility
+            'HFHinge': HFHingeLoss(fmin=hf_hinge_fmin, strength=hf_hinge_strength)
+        }
         if pre_filt:
             pre_filt = PreEmph(pre_filt)
             loss_dict['ESRPre'] = lambda output, target: loss_dict['ESR'].forward(*pre_filt(output, target))
