@@ -1,0 +1,34 @@
+Mac MPS Version - Directory Structure
+=====================================
+
+mac-mps-version/
+├── CoreAudioML/              # Core training modules (complete copy)
+│   ├── __init__.py
+│   ├── dataset.py
+│   ├── diagnostics.py
+│   ├── miscfuncs.py
+│   ├── networks.py
+│   ├── training.py
+│   ├── test/                 # Test files
+│   └── result_test/          # Test results
+│
+├── Configs/                   # Configuration files
+│   ├── RNN1.json
+│   ├── RNN2.json
+│   └── RNN3.json
+│
+├── device_utils.py           # NEW: Cross-platform device management
+├── dist_model_recnet_mps.py  # MODIFIED: Training script with MPS support
+├── GuitarAmp_Training_Mac.ipynb  # NEW: Mac-specific notebook
+├── README_MAC.md             # NEW: Mac documentation
+├── SUMMARY.md                 # NEW: Quick summary
+├── requirements.txt           # UPDATED: PyTorch 2.0+ requirement
+└── STRUCTURE.txt             # This file
+
+Key Files:
+- device_utils.py: Handles MPS/CUDA/CPU device detection and management
+- dist_model_recnet_mps.py: Main training script (modified from original)
+- GuitarAmp_Training_Mac.ipynb: Jupyter notebook for Mac training
+- README_MAC.md: Complete Mac setup and usage guide
+
+Total Size: ~3.8 MB

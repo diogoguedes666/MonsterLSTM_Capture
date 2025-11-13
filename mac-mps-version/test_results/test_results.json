@@ -1,0 +1,75 @@
+{
+  "summary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "elapsed_time": 10.056719064712524
+  },
+  "tests": [
+    {
+      "name": "Environment Imports",
+      "status": "PASS",
+      "details": "PyTorch 2.6.0.dev20240922, Device: Apple Silicon GPU (MPS)"
+    },
+    {
+      "name": "Device Utilities",
+      "status": "PASS",
+      "details": "Device: Apple Silicon GPU (MPS), AMP: False, Memory available: True"
+    },
+    {
+      "name": "Data Loading",
+      "status": "PASS",
+      "details": "Train: torch.Size([22050, 4417, 1]), Val: torch.Size([17233338, 1, 1]), Test: torch.Size([20213517, 1, 1])"
+    },
+    {
+      "name": "Model Initialization",
+      "status": "PASS",
+      "details": "Model on mps, Forward pass: torch.Size([100, 4, 1]) -> torch.Size([100, 4, 1])"
+    },
+    {
+      "name": "Loss Functions",
+      "status": "PASS",
+      "details": "Total loss: 1.449236, ESR: 1.896646, DC: 0.003523"
+    },
+    {
+      "name": "Training Loop",
+      "status": "PASS",
+      "details": "Epoch loss: 2.589520"
+    },
+    {
+      "name": "Validation",
+      "status": "PASS",
+      "details": "Validation loss: 0.879561, Output shape: torch.Size([10000, 1, 1])"
+    },
+    {
+      "name": "Checkpoint Operations",
+      "status": "PASS",
+      "details": "Checkpoint saved and loaded successfully, 6 parameters verified"
+    },
+    {
+      "name": "Memory Management",
+      "status": "PASS",
+      "details": "RAM: 2024.8MB -> 2025.9MB -> 2025.9MB, Device memory available: True"
+    },
+    {
+      "name": "Diagnostics",
+      "status": "PASS",
+      "details": "Stats saved: 1 training, 1 validation"
+    },
+    {
+      "name": "Performance Profiling",
+      "status": "PASS",
+      "details": "Forward pass: 12.63ms, Loss computation: 8.44ms"
+    },
+    {
+      "name": "Edge Cases",
+      "status": "PASS",
+      "details": "CPU fallback: OK; Small batch: OK; Empty tensor: Failed gracefully (expected); High grad clip: OK; Low grad clip: OK"
+    },
+    {
+      "name": "Autotuner",
+      "status": "PASS",
+      "details": "AutoTuner: State save/load OK, Trend analysis: oscillating"
+    }
+  ]
+}

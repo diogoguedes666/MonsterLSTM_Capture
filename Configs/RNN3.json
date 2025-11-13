@@ -1,1 +1,1 @@
-{"hidden_size": 96, "unit_type": "LSTM", "loss_fcns": {"ESR": 0.75, "DC": 0.10, "HFHinge": 0.15}, "pre_filt": "None", "device": "dls2", "file_name": "dls2", "hf_hinge_fmin": 10000, "hf_hinge_strength": 0.5}
+{"hidden_size": 64, "unit_type": "LSTM", "loss_fcns": {"ESR": 0.60, "DC": 0.10, "HFHinge": 0.30}, "pre_filt": "None", "device": "dls2", "file_name": "dls2", "hf_hinge_fmin": 8000, "hf_hinge_strength": 1.0}

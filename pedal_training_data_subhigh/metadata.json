@@ -1,0 +1,442 @@
+{
+  "sample_rate": 44100,
+  "base_duration": 1.0,
+  "generation_date": "2025-11-11T17:47:02.630464",
+  "signals": [
+    {
+      "name": "log_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "linear_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "exponential_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "multiband_sweeps",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "amplitude_sweep_linear",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "amplitude_sweep_log",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "chirp_with_am",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "white_noise_bursts",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "pink_noise",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "brown_noise",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "bandlimited_noise_sub",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "bandlimited_noise_mid",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "bandlimited_noise_high",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "noise_bursts_multiband",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "impulse_train",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "harmonic_series",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "inharmonic_series",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "power_chords",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "complex_chords",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "vibrato",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "palm_muted",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "pinch_harmonic",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "sliding_notes",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "tremolo_picking",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "dynamic_playing",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "phase_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "intermodulation_test",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "crest_factor_variations",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "transient_response",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "nonlinear_test",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ]
+    },
+    {
+      "name": "sub_bass_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "high_freq_sweep",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_bass_harmonics_40hz",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_bass_harmonics_60hz",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_bass_harmonics_80hz",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "high_freq_harmonics_5k",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "high_freq_harmonics_10k",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_high_combined",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_bass_noise",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "high_freq_noise",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "sub_bass_chirp",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    },
+    {
+      "name": "high_freq_chirp",
+      "variations": 4,
+      "amplitude_levels": [
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "frequency_range": "sub_bass_high"
+    }
+  ],
+  "max_duration_seconds": 120.0,
+  "num_signal_types": 12,
+  "frequency_focus": "sub_bass_and_high_frequencies"
+}

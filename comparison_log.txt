@@ -1,0 +1,87 @@
+2025-11-12 10:09:07,034 - matplotlib.legend - WARNING - No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+2025-11-12 10:22:40,413 - matplotlib.legend - WARNING - No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+no saved model found, creating new network
+[94m[AutoTuner] Starting with initial learning rate: 0.000500[0m
+[94m[Dashboard] Training dashboard initialized[0m
+Validation loss: 0.659287
+[92mNew best validation loss: 0.659287[0m
+current learning rate: 0.0005
+Validation loss: 0.653006
+[91mError during training: [Errno 2] No such file or directory: 'Results/compare_skip_no_skip_20251112_101931/dls2-RNN3'[0m
+Traceback (most recent call last):
+  File "/Users/diogoguedes/Documents/GitHub/Automated-GuitarAmpModelling 3/dist_model_recnet.py", line 1749, in <module>
+    raise e
+  File "/Users/diogoguedes/Documents/GitHub/Automated-GuitarAmpModelling 3/dist_model_recnet.py", line 1692, in <module>
+    network.save_model('model_best', save_path)
+  File "/Users/diogoguedes/Documents/GitHub/Automated-GuitarAmpModelling 3/CoreAudioML/networks.py", line 54, in save_model
+    miscfuncs.dir_check(direc)
+  File "/Users/diogoguedes/Documents/GitHub/Automated-GuitarAmpModelling 3/CoreAudioML/miscfuncs.py", line 13, in dir_check
+    os.mkdir(dir_path)
+FileNotFoundError: [Errno 2] No such file or directory: 'Results/compare_skip_no_skip_20251112_101931/dls2-RNN3'
+
+================================================================================
+SKIP CONNECTION COMPARISON EXPERIMENT
+================================================================================
+
+Configuration:
+  Epochs per experiment: 20
+  Data location: ./Data
+  File name: dls2
+  Loss functions: {'ESR': 0.4, 'DC': 0.1, 'HFHinge': 0.3}
+  HF hinge strength: 1.5
+  HF hinge fmin: 8000 Hz
+  Hidden size: 96
+  Number of blocks: 2
+
+This will run TWO experiments:
+  1. With skip connection (skip_con=1) - baseline
+  2. Without skip connection (skip_con=0) - test
+
+Total training time: ~20.0 minutes (estimated)
+================================================================================
+
+Starting in 3 seconds... (Ctrl+C to cancel)Starting in 2 seconds... (Ctrl+C to cancel)Starting in 1 seconds... (Ctrl+C to cancel)
+
+
+================================================================================
+Starting Experiment: with_skip
+Skip Connection: 1
+Epochs: 20
+================================================================================
+
+Command: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 dist_model_recnet.py --skip_con 1 --epochs 20 --data_location ./Data --file_name dls2 --loss_fcns {'ESR': 0.4, 'DC': 0.1, 'HFHinge': 0.3} --hf_hinge_strength 1.5 --hf_hinge_fmin 8000 --hidden_size 96 --num_blocks 2 --enable_diagnostics --save_location Results/compare_skip_with_skip_20251112_100519
+
+Results will be saved to: Results/compare_skip_with_skip_20251112_100519
+
+
+❌ Experiment 'with_skip' failed!
+   Time elapsed: 14.20 minutes
+
+
+================================================================================
+Starting Experiment: no_skip
+Skip Connection: 0
+Epochs: 20
+================================================================================
+
+Command: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 dist_model_recnet.py --skip_con 0 --epochs 20 --data_location ./Data --file_name dls2 --loss_fcns {'ESR': 0.4, 'DC': 0.1, 'HFHinge': 0.3} --hf_hinge_strength 1.5 --hf_hinge_fmin 8000 --hidden_size 96 --num_blocks 2 --enable_diagnostics --save_location Results/compare_skip_no_skip_20251112_101931
+
+Results will be saved to: Results/compare_skip_no_skip_20251112_101931
+
+
+❌ Experiment 'no_skip' failed!
+   Time elapsed: 6.81 minutes
+
+
+================================================================================
+COMPARISON SUMMARY
+================================================================================
+
+Experiment Status:
+  With Skip (skip_con=1):    failed
+  Without Skip (skip_con=0):  failed
+
+⚠️  One or both experiments failed. Check logs above.
+
+📊 Full comparison summary saved to: Results/compare_skip_summary_20251112_102620.json
+

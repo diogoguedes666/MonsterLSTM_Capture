@@ -1,0 +1,12 @@
+torch>=2.0.0
+numpy>=1.19.2
+scipy>=1.7.0
+matplotlib>=3.4.3
+PyYAML>=5.4.1
+tqdm>=4.62.3
+librosa>=0.9.0
+tensorboard>=2.7.0
+psutil>=5.8.0
+pytest>=6.2.5  # for testing
+black>=21.9b0  # for code formatting (optional)
+mypy>=0.910    # for type checking (optional)

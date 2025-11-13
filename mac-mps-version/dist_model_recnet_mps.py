@@ -3,6 +3,7 @@ import CoreAudioML.training as training
 import CoreAudioML.dataset as dataset
 import CoreAudioML.networks as networks
 import CoreAudioML.diagnostics as diagnostics
+import device_utils
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
@@ -82,7 +83,7 @@ prsr.add_argument('--up_fr', '-uf', type=int, default=750,
 prsr.add_argument('--cuda', '-cu', default=1, help='Use GPU if available')
 
 # loss function/s
-prsr.add_argument('--loss_fcns', '-lf', default={'ESR': 0.85, 'DC': 0.10, 'HFHinge': 0.05},
+prsr.add_argument('--loss_fcns', '-lf', default={'ESR': 0.50, 'DC': 0.10, 'HFHinge': 0.10},
                   help='Which loss functions, ESR, ESRPre, DC, Spectral (deprecated), HFHinge. Argument is a dictionary with each key representing a'
                        'loss function name and the corresponding value being the multiplication factor applied to that'
                        'loss function, used to control the contribution of each loss function to the overall loss ')
@@ -101,9 +102,9 @@ prsr.add_argument('--model', '-m', default='SimpleRNN', type=str, help='model ar
 prsr.add_argument('--input_size', '-is', default=1, type=int, help='1 for mono input data, 2 for stereo, etc ')
 prsr.add_argument('--output_size', '-os', default=1, type=int, help='1 for mono output data, 2 for stereo, etc ')
 prsr.add_argument('--num_blocks', '-nb', default=2, type=int, help='Number of recurrent blocks')
-prsr.add_argument('--hidden_size', '-hs', default=64, type=int, help='Recurrent unit hidden state size (DAFx\'19 recommendation: 64-96 for real-time)')
+prsr.add_argument('--hidden_size', '-hs', default=96, type=int, help='Recurrent unit hidden state size (DAFx\'19 recommendation: 64-96 for real-time)')
 prsr.add_argument('--unit_type', '-ut', default='LSTM', help='LSTM or GRU or RNN')
-prsr.add_argument('--skip_con', '-sc', type=int, default=0, help='is there a skip connection for the input to the output (0=no skip, 1=skip)')
+prsr.add_argument('--skip_con', '-sc', default=1, help='is there a skip connection for the input to the output')
 
 prsr.add_argument('--weight_decay', '-wd', type=float, default=1e-4, help='Weight decay for optimizer (recurrent weights use lower decay: 3e-5)')
 prsr.add_argument('--hf_hinge_fmin', type=float, default=10000, help='HF hinge loss minimum frequency threshold (Hz)')
@@ -139,7 +140,7 @@ class AutoTunerConfig:
     # Existing parameters
     initial_lr: float
     initial_grad_clip: float
-    min_lr: float = 0.00000001  # Lower minimum to allow more fine-tuning
+    min_lr: float = 0.000001  # Lower minimum to allow more fine-tuning
     max_lr: float = 1.0
     min_grad_clip: float = 1e-3
     max_grad_clip: float = 100.0
@@ -315,7 +316,7 @@ class DataShuffler:
         for i in range(0, len(data), batch_size):
             batch = data[i:i + batch_size]
             # Process batch operations here
-            torch.cuda.empty_cache()  # Clear GPU cache if using GPU
+            device_utils.clear_cache()  # Clear GPU cache if using GPU
             
         # Get final memory state and calculate delta
         current_memory = psutil.Process().memory_info().rss
@@ -327,9 +328,12 @@ class DataShuffler:
                 print(f"\033[93m[DataShuffler] Warning: Large memory increase detected!\033[0m")
         
         # Log peak memory usage for GPU if available
-        if torch.cuda.is_available():
-            peak_gpu_memory = torch.cuda.max_memory_allocated() / (1024 * 1024)  # Convert to MB
-            print(f"\033[94m[DataShuffler] Peak GPU memory: {peak_gpu_memory:.2f} MB\033[0m")
+        device = device_utils.get_device()
+        mem_info = device_utils.get_memory_info(device)
+        if mem_info['available']:
+            peak_mem = device_utils.get_peak_memory_allocated(device)
+            if peak_mem is not None:
+                print(f"\033[94m[DataShuffler] Peak GPU memory: {peak_mem * 1024:.2f} MB\033[0m")
             
         return memory_delta
 
@@ -341,11 +345,13 @@ class DataShuffler:
         print(f"RSS: {memory_info.rss / (1024 * 1024):.2f} MB")
         print(f"VMS: {memory_info.vms / (1024 * 1024):.2f} MB")
         
-        if torch.cuda.is_available():
-            allocated = torch.cuda.memory_allocated() / (1024 * 1024)
-            cached = torch.cuda.memory_reserved() / (1024 * 1024)
-            print(f"GPU Allocated: {allocated:.2f} MB")
-            print(f"GPU Cached: {cached:.2f} MB")
+        device = device_utils.get_device()
+        mem_info_gpu = device_utils.get_memory_info(device)
+        if mem_info_gpu['available']:
+            if mem_info_gpu['allocated'] is not None:
+                print(f"GPU Allocated: {mem_info_gpu['allocated'] * 1024:.2f} MB")
+            if mem_info_gpu['cached'] is not None:
+                print(f"GPU Cached: {mem_info_gpu['cached'] * 1024:.2f} MB")
         print("\033[0m")
 
 def log_memory_usage():
@@ -376,7 +382,7 @@ class OptimizedLRManager:
             print(f"Reducing LR to {param_group['lr']}")
 
 class AdvancedLRManager:
-    def __init__(self, optimizer, max_lr=0.01, min_lr=0.00000001, total_epochs=1000, 
+    def __init__(self, optimizer, max_lr=0.01, min_lr=0.000001, total_epochs=100, 
                  warmup_epochs=5, cycles=3, patience=5):
         self.optimizer = optimizer
         self.max_lr = max_lr
@@ -549,9 +555,11 @@ class PerformanceMonitor:
             
     def get_summary(self) -> Dict[str, float]:
         """Get summary of performance metrics."""
+        device = device_utils.get_device()
+        peak_mem = device_utils.get_peak_memory_allocated(device)
         return {
             'training_time': time.time() - self.start_time,
-            'peak_memory': torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
+            'peak_memory': peak_mem * (1024**3) if peak_mem is not None else 0,
             'average_loss': np.mean(self.metrics['loss']) if self.metrics['loss'] else 0
         }
 
@@ -963,7 +971,7 @@ def train_epoch(network, dataset, optimizer, loss_fn, args):
         optimizer.zero_grad()
         
         # Forward pass
-        with torch.cuda.amp.autocast():  # Mixed precision for speed
+        with device_utils.get_amp_context():  # Mixed precision for speed (CUDA only)
             output = network(input_chunk)
             loss = loss_fn(output, target_chunk)
         
@@ -996,9 +1004,8 @@ def validate(network, val_dataset, loss_fn, args):
 
 # Add explicit memory cleanup
 def cleanup_gpu_memory():
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        gc.collect()
+    device_utils.clear_cache()
+    gc.collect()
 
 class CustomLogger:
     """Custom logging class for enhanced logging capabilities."""
@@ -1183,14 +1190,17 @@ class DistributedTrainer:
             rank=self.rank
         )
         
-        # Move model to GPU and wrap with DDP
-        self.model = self.model.cuda(self.rank)
-        self.model = DistributedDataParallel(
-            self.model,
-            device_ids=[self.rank],
-            output_device=self.rank,
-            find_unused_parameters=True
-        )
+        # Move model to device and wrap with DDP
+        device = device_utils.get_device()
+        self.model = self.model.to(device)
+        # Note: DDP is primarily for CUDA, MPS doesn't support distributed training yet
+        if device.type == 'cuda':
+            self.model = DistributedDataParallel(
+                self.model,
+                device_ids=[self.rank],
+                output_device=self.rank,
+                find_unused_parameters=True
+            )
         
     def distributed_train_step(
         self,
@@ -1199,8 +1209,9 @@ class DistributedTrainer:
     ) -> Dict[str, float]:
         """Execute a single distributed training step."""
         # Ensure data is on correct device
-        batch = batch.cuda(self.rank)
-        target = target.cuda(self.rank)
+        device = device_utils.get_device()
+        batch = batch.to(device)
+        target = target.to(device)
         
         # Forward pass
         self.optimizer.zero_grad()
@@ -1225,11 +1236,13 @@ class ModelProfiler:
     
     def __init__(self, model: torch.nn.Module):
         self.model = model
+        device = device_utils.get_device()
+        activities = [torch.profiler.ProfilerActivity.CPU]
+        if device.type == 'cuda':
+            activities.append(torch.profiler.ProfilerActivity.CUDA)
+        # MPS profiling not yet supported in torch.profiler
         self.profiler = torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CPU,
-                torch.profiler.ProfilerActivity.CUDA,
-            ],
+            activities=activities,
             schedule=torch.profiler.schedule(
                 wait=1,
                 warmup=1,
@@ -1251,8 +1264,10 @@ class ModelProfiler:
         results = {}
         
         # Memory profiling
-        torch.cuda.reset_peak_memory_stats()
-        start_mem = torch.cuda.memory_allocated()
+        device = device_utils.get_device()
+        device_utils.reset_peak_memory_stats(device)
+        mem_info = device_utils.get_memory_info(device)
+        start_mem = mem_info['allocated'] * (1024**3) if mem_info['allocated'] is not None else 0
         
         with self.profiler as prof:
             # Warmup
@@ -1266,8 +1281,11 @@ class ModelProfiler:
             
         # Collect results
         results['inference_time'] = inference_time
-        results['memory_usage'] = torch.cuda.memory_allocated() - start_mem
-        results['peak_memory'] = torch.cuda.max_memory_allocated()
+        mem_info_after = device_utils.get_memory_info(device)
+        end_mem = mem_info_after['allocated'] * (1024**3) if mem_info_after['allocated'] is not None else 0
+        results['memory_usage'] = end_mem - start_mem
+        peak_mem = device_utils.get_peak_memory_allocated(device)
+        results['peak_memory'] = peak_mem * (1024**3) if peak_mem is not None else 0
         
         if detailed:
             results['layer_stats'] = self._analyze_layer_stats(prof)
@@ -1542,11 +1560,15 @@ if __name__ == "__main__":
     # Check if an existing saved model exists, and load it, otherwise creates a new model
     network = init_model(save_path, args)
 
-    # Check if a cuda device is available
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
+    # Detect and use the best available device (MPS > CUDA > CPU)
+    force_cpu = (args.cuda == 0)
+    device = device_utils.get_device(force_cpu=force_cpu)
+    
+    # Print device information
+    device_utils.print_device_info(device)
+    
+    # Move network to device
+    network = network.to(device)
 
     # Initialize network, optimizer, and scheduler
     # DAFx'19 compatible optimizer settings
@@ -1580,6 +1602,9 @@ if __name__ == "__main__":
     loss_functions = training.LossWrapper(args.loss_fcns, args.pre_filt, 
                                          hf_hinge_fmin=hf_hinge_fmin,
                                          hf_hinge_strength=hf_hinge_strength)
+    
+    # Move loss functions to device (important for buffers like hf_mask)
+    loss_functions = loss_functions.to(device)
 
     # Initialize train_track first
     train_track = training.TrainTrack()
@@ -1623,6 +1648,17 @@ if __name__ == "__main__":
     dataset.create_subset('test')
     dataset.load_file(os.path.join('test', args.file_name), 'test')
 
+    # Move dataset tensors to device
+    print(f"\n📦 Moving dataset to device: {device}")
+    for subset_name in ['train', 'val', 'test']:
+        if subset_name in dataset.subsets:
+            subset = dataset.subsets[subset_name]
+            if 'input' in subset.data:
+                subset.data['input'] = tuple(t.to(device) for t in subset.data['input'])
+            if 'target' in subset.data:
+                subset.data['target'] = tuple(t.to(device) for t in subset.data['target'])
+    print("✅ Dataset moved to device")
+
 
     # If training is restarting, this will ensure the previously elapsed training time is added to the total
     init_time = time.time() - start_time + train_track['total_time']*3600
@@ -1642,7 +1678,7 @@ if __name__ == "__main__":
     # Initialize adaptive validator
     validator = AdaptiveValidator(
         initial_freq=args.validation_f,
-        min_freq=3,
+        min_freq=2,
         max_freq=20
     )
 
@@ -1775,7 +1811,8 @@ if __name__ == "__main__":
     train_track['test_loss_best'] = test_loss.item()
     train_track['test_lossESR_best'] = test_loss_ESR.item()
     save_training_state()
-    if torch.cuda.is_available():
+    peak_mem = device_utils.get_peak_memory_allocated(device)
+    if peak_mem is not None:
         with open(os.path.join(save_path, 'maxmemusage.txt'), 'w') as f:
-            f.write(str(torch.cuda.max_memory_allocated()))
+            f.write(str(int(peak_mem * (1024**3))))
 
